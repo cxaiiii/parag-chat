@@ -1,0 +1,26 @@
+{
+    "chunks":  [
+                   {
+                       "file":  "parag-00.bin",
+                       "size":  83886080
+                   },
+                   {
+                       "file":  "parag-01.bin",
+                       "size":  83886080
+                   },
+                   {
+                       "file":  "parag-02.bin",
+                       "size":  83886080
+                   },
+                   {
+                       "file":  "parag-03.bin",
+                       "size":  83886080
+                   },
+                   {
+                       "file":  "parag-04.bin",
+                       "size":  62263040
+                   }
+               ],
+    "name":  "parag-chat-0.5B-Q4_K_M.gguf",
+    "totalSize":  397807360
+}

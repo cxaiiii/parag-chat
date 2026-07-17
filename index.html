@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parag — a tiny AI that lives in your browser</title>
+<meta name="description" content="Parag is a 0.5B-parameter chat model by Chaitanya (cxaiiii). It downloads once and runs entirely in your browser — no server, no API.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🪷</text></svg>">
+<link rel="stylesheet" href="./assets/style.css">
+<script src="./coi-serviceworker.min.js"></script>
+</head>
+<body>
+
+<div class="frame">
+  <header class="masthead">
+    <div class="wordmark">
+      <span class="wordmark-hindi" aria-hidden="true">पराग</span>
+      <h1 class="wordmark-latin">Parag</h1>
+    </div>
+    <p class="masthead-tag">a pocket-sized AI &middot; 0.5&thinsp;B parameters &middot; runs entirely in <em>your</em> browser</p>
+  </header>
+
+  <!-- ============ LANDING / DOWNLOAD STATE ============ -->
+  <main id="landing" class="landing">
+    <div class="landing-card">
+      <div class="lotus" aria-hidden="true">🪷</div>
+      <h2 class="landing-title">Meet Parag</h2>
+      <p class="landing-copy">
+        Parag is a small chat model built by <strong>Chaitanya (cxaiiii)</strong>,
+        distilled from his own dataset. There is no server behind this page —
+        the model itself downloads to your device and thinks right here in the browser.
+      </p>
+      <p class="landing-note">
+        One-time download of <strong>~380&nbsp;MB</strong> (cached for next time).
+        Wi-Fi recommended. A laptop or desktop gives the best speed.
+      </p>
+      <button id="btn-load" class="btn-primary">
+        <span class="btn-label">Wake Parag up</span>
+        <span class="btn-sub">download 380 MB &middot; free forever</span>
+      </button>
+
+      <div id="progress-wrap" class="progress-wrap" hidden>
+        <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+        <div class="progress-row">
+          <span id="progress-label">Preparing…</span>
+          <span id="progress-pct">0%</span>
+        </div>
+      </div>
+      <p id="load-error" class="load-error" hidden></p>
+    </div>
+    <p class="landing-foot">Private by design — your chats never leave this device.</p>
+  </main>
+
+  <!-- ============ CHAT STATE ============ -->
+  <main id="chat" class="chat" hidden>
+    <div id="messages" class="messages" aria-live="polite"></div>
+
+    <div class="composer-wrap">
+      <div class="suggestions" id="suggestions">
+        <button class="chip">Hi Parag! Who are you?</button>
+        <button class="chip">Who built you?</button>
+        <button class="chip">Explain the monsoon in two sentences</button>
+        <button class="chip">One tip to focus while studying</button>
+      </div>
+      <form id="composer" class="composer">
+        <textarea id="input" rows="1" placeholder="Say something to Parag…" autocomplete="off"></textarea>
+        <button id="btn-send" type="submit" class="btn-send" aria-label="Send">➤</button>
+        <button id="btn-stop" type="button" class="btn-stop" hidden>Stop</button>
+      </form>
+      <p class="chat-foot"><span id="stat-line">local &middot; ready</span> &middot; small model, big heart — it can make mistakes</p>
+    </div>
+  </main>
+
+  <footer class="colophon">
+    <span>Parag-Chat v0 &middot; built by <a href="https://github.com/cxaiiii" rel="noopener">Chaitanya (cxaiiii)</a></span>
+    <span class="colophon-dot">&middot;</span>
+    <span>llama.cpp × WebAssembly</span>
+  </footer>
+</div>
+
+<script type="module" src="./assets/app.js"></script>
+</body>
+</html>
