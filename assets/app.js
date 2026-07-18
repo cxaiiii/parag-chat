@@ -75,8 +75,12 @@ async function getChunk(url, cache, onBytes) {
 }
 
 async function downloadModel() {
-  const manifest = await (await fetch(MODEL_DIR + 'manifest.json')).json();
-  const cache = await caches.open(CACHE_NAME).catch(() => null);
+  const modelName = $('model-select') ? $('model-select').value : 'parag-v3-0.5B';
+  const manifestUrl = MODEL_DIR + 'manifest-' + modelName + '.json';
+  const cacheName = 'parag-model-' + modelName;
+
+  const manifest = await (await fetch(manifestUrl)).json();
+  const cache = await caches.open(cacheName).catch(() => null);
   const total = manifest.totalSize;
   let received = 0;
 
