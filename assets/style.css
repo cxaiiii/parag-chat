@@ -196,7 +196,8 @@ body {
 
 .progress-bar {
   height: 100%;
-  width: 0%;
+  width: 2%;
+  min-width: 2%;
   border-radius: 999px;
   background: repeating-linear-gradient(-45deg, var(--marigold), var(--marigold) 8px, var(--marigold-deep) 8px, var(--marigold-deep) 16px);
   background-size: 200% 100%;
