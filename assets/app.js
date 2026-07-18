@@ -19,7 +19,7 @@ function buildPrompt(context) {
 }
 
 const MODEL_DIR = './model/';
-const CACHE_NAME = 'parag-model-v1';
+const CACHE_NAME = 'parag-model-v2';
 const MAX_HISTORY = 8; // messages (excl. system) kept in context
 
 // ————— elements —————
