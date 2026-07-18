@@ -202,7 +202,7 @@ async function generate(userText) {
     await wllama.createCompletion({
       prompt: buildPrompt(context),
       stream: true,
-      max_tokens: 512,
+      max_tokens: 2048,
       temp: 0.6,
       penalty_repeat: 1.18,
       penalty_last_n: 128,
