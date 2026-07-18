@@ -200,32 +200,52 @@ async function generate(userText) {
   const t0 = performance.now();
 
   try {
-    await wllama.createCompletion({
+    const result = await wllama.createCompletion({
       prompt: buildPrompt(context),
       stream: true,
       max_tokens: 2048,
       temp: 0.6,
       penalty_repeat: 1.0,
       penalty_last_n: 128,
-      cache_prompt: true,
+      cache_prompt: false,
+      stop: ['<|im_end|>', '<|im_start|>'],
       abortSignal: aborter.signal,
       onData: (chunk) => {
-        if (stopped) return;           // block late callbacks after abort
+        if (stopped) return;
         const delta = chunk?.choices?.[0]?.text;
         if (!delta) return;
         text += delta;
         tokens += 1;
-        // safety: cut generation if the model starts a fake next turn
+        // safety: cut generation if the model emits raw turn markers as text
         const cut = text.search(/<\|im_(end|start)\|>|\n\s*(user|assistant)\s*[:\n]/i);
         if (cut !== -1) {
           text = text.slice(0, cut);
-          stopped = true;              // immediately block future callbacks
+          stopped = true;
           aborter.abort();
         }
         bubble.textContent = text;
         scrollToEnd();
       },
     });
+
+    // Wllama may return a final chunk that wasn't dispatched via onData
+    // (e.g. the last token before EOG that was held in the C++ batch buffer).
+    // Merge it into our displayed text so nothing gets lost.
+    if (!stopped && result) {
+      const tail = result?.choices?.[0]?.text;
+      if (tail && !text.endsWith(tail)) {
+        // The result contains the FULL generated text, not just a delta.
+        // If it's longer than what we accumulated, use it.
+        const fullText = tail;
+        if (fullText.length > text.length) {
+          text = fullText;
+        }
+      }
+      // Clean any stop markers from the final text
+      const cut = text.search(/<\|im_(end|start)\|>/);
+      if (cut !== -1) text = text.slice(0, cut);
+      bubble.textContent = text;
+    }
   } catch (err) {
     if (err?.name !== 'AbortError' && !String(err).includes('abort')) {
       if (!text) bubble.textContent = '(Sorry, something went wrong: ' + (err?.message || err) + ')';
