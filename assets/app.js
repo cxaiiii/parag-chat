@@ -206,7 +206,6 @@ async function generate(userText) {
       temp: 0.6,
       penalty_repeat: 1.18,
       penalty_last_n: 128,
-      stop: ['<|im_end|>', '<|im_start|>'],
       cache_prompt: true,
       abortSignal: aborter.signal,
       onData: (chunk) => {
