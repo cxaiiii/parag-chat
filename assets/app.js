@@ -196,6 +196,7 @@ async function generate(userText) {
   aborter = new AbortController();
   let text = '';
   let tokens = 0;
+  let stopped = false;
   const t0 = performance.now();
 
   try {
@@ -209,15 +210,16 @@ async function generate(userText) {
       cache_prompt: true,
       abortSignal: aborter.signal,
       onData: (chunk) => {
+        if (stopped) return;           // block late callbacks after abort
         const delta = chunk?.choices?.[0]?.text;
         if (!delta) return;
         text += delta;
         tokens += 1;
-        // safety: cut generation if the model starts a fake next turn —
-        // either with raw chat-format tokens or plain-text "user"/"assistant" markers
+        // safety: cut generation if the model starts a fake next turn
         const cut = text.search(/<\|im_(end|start)\|>|\n\s*(user|assistant)\s*[:\n]/i);
         if (cut !== -1) {
           text = text.slice(0, cut);
+          stopped = true;              // immediately block future callbacks
           aborter.abort();
         }
         bubble.textContent = text;
@@ -235,7 +237,10 @@ async function generate(userText) {
   // FIX: Do NOT trim the text here! Trimming alters the exact string that wllama 
   // holds in its KV cache. If we pass a trimmed string back in the next turn's prompt, 
   // the token boundaries mismatch and wllama's cache_prompt logic corrupts, leaking text.
-  if (text) history.push({ role: 'assistant', content: text });
+  // Use the bubble's displayed text as the canonical content for history.
+  // This is the clean, post-slice version — immune to late onData callbacks.
+  const finalText = bubble.textContent;
+  if (finalText) history.push({ role: 'assistant', content: finalText });
   else if (!bubble.textContent) bubble.textContent = '…';
 
   const secs = (performance.now() - t0) / 1000;
