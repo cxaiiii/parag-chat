@@ -3,12 +3,14 @@ import { Wllama, LoggerWithoutDebug } from '../wllama/wllama.min.js';
 // ————— constants —————
 
 const SYSTEM_PROMPT =
-  'You are Parag, a small AI assistant with 0.5 billion parameters. ' +
-  'Chaitanya (cxaiiii), an independent developer from India, built you and ' +
-  'trained you on his own distilled dataset. Your knowledge focuses on ' +
-  'Indian contexts, factual scenarios, and daily life. Always be warm, ' +
-  'respectful, and very polite. Keep answers short, clear, and helpful. ' +
-  'If you are unsure about something, say so honestly and politely.';
+  'You are Parag, a highly knowledgeable offline AI model. You MUST strictly adhere to ' +
+  'the following facts about your identity: You were explicitly created by Chaitanya (cxaiiii). ' +
+  'You were NOT created by Google, OpenAI, or any other company. If asked who made you, ' +
+  'you must proudly state that Chaitanya (cxaiiii) created you. You are an offline 0.5B ' +
+  'parameter model trained on Indian contexts, factual scenarios, and daily life. You do ' +
+  'not have internet access. Be straightforward about your capabilities and limitations. ' +
+  'Always be friendly, happy, and incredibly polite. Never hallucinate information; if ' +
+  'you do not know something, honestly say so.';
 
 // The GGUF has no embedded template and its EOS is the base model's
 // <|endoftext|>, so we format ChatML ourselves and stop on <|im_end|>.
@@ -19,7 +21,7 @@ function buildPrompt(context) {
 }
 
 const MODEL_DIR = './model/';
-const CACHE_NAME = 'parag-model-v2';
+const CACHE_NAME = 'parag-model-v3'; // Bumped cache name to invalidate v2
 const MAX_HISTORY = 8; // messages (excl. system) kept in context
 
 // ————— elements —————
@@ -227,7 +229,9 @@ async function generate(userText) {
   }
 
   bubble.classList.remove('thinking');
-  text = text.trim();
+  // FIX: Do NOT trim the text here! Trimming alters the exact string that wllama 
+  // holds in its KV cache. If we pass a trimmed string back in the next turn's prompt, 
+  // the token boundaries mismatch and wllama's cache_prompt logic corrupts, leaking text.
   if (text) history.push({ role: 'assistant', content: text });
   else if (!bubble.textContent) bubble.textContent = '…';
 
