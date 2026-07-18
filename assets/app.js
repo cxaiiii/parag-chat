@@ -204,7 +204,7 @@ async function generate(userText) {
       stream: true,
       max_tokens: 2048,
       temp: 0.6,
-      penalty_repeat: 1.18,
+      penalty_repeat: 1.0,
       penalty_last_n: 128,
       cache_prompt: true,
       abortSignal: aborter.signal,
