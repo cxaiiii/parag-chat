@@ -73,10 +73,12 @@ async function getChunk(url, cache, onBytes) {
   return blob;
 }
 
+const MODEL_NAME = 'parag-v3-0.5B'; // only model we ship
+const DOWNLOAD_CONCURRENCY = 6;     // parallel chunk fetches
+
 async function downloadModel() {
-  const modelName = $('model-select') ? $('model-select').value : 'parag-v3-0.5B';
-  const manifestUrl = MODEL_DIR + 'manifest-' + modelName + '.json';
-  const cacheName = 'parag-model-' + modelName;
+  const manifestUrl = MODEL_DIR + 'manifest-' + MODEL_NAME + '.json';
+  const cacheName = 'parag-model-' + MODEL_NAME;
 
   const manifest = await (await fetch(manifestUrl)).json();
   const cache = await caches.open(cacheName).catch(() => null);
@@ -92,15 +94,27 @@ async function downloadModel() {
       `Downloading Parag — ${(received / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`;
   };
 
-  const blobs = [];
-  for (const chunk of manifest.chunks) {
-    const url = MODEL_DIR + chunk.file;
-    blobs.push(
-      cache
+  // Fetch chunks with a bounded concurrency pool. The old code awaited each
+  // chunk before starting the next, so every network round-trip serialized and
+  // the download crawled. A pool keeps several fetches in flight at once; the
+  // ordered `blobs` array is filled by index so assembly stays correct.
+  const chunks = manifest.chunks;
+  const blobs = new Array(chunks.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= chunks.length) return;
+      const url = MODEL_DIR + chunks[i].file;
+      blobs[i] = cache
         ? await getChunk(url, cache, onBytes)
-        : await (await fetch(url)).blob().then((b) => (onBytes(b.size), b))
-    );
+        : await (await fetch(url)).blob().then((b) => (onBytes(b.size), b));
+    }
   }
+
+  const pool = Math.min(DOWNLOAD_CONCURRENCY, chunks.length);
+  await Promise.all(Array.from({ length: pool }, worker));
   return new Blob(blobs);
 }
 
@@ -128,7 +142,7 @@ btnLoad.addEventListener('click', async () => {
     );
     wllama.setCompat('default'); // only kicks in on browsers that need it (Safari)
 
-    await wllama.loadModel([modelBlob], { n_ctx: 2048 });
+    await wllama.loadModel([modelBlob], { n_ctx: 4096 });
     window.__wllama = wllama; // debugging hook
 
     const mode = wllama.isMultithread()
@@ -226,12 +240,16 @@ async function generate(userText) {
     const result = await wllama.createCompletion({
       prompt: buildPrompt(context),
       stream: true,
-      max_tokens: 512,
+      max_tokens: 1024,
       temp: 0.6,
       penalty_repeat: 1.0,
       penalty_last_n: 128,
       cache_prompt: false,
-      stop: ['<|im_end|>', '<|im_start|>'],
+      // No `stop` strings: <|im_end|> is a native EOG token so generation stops
+      // on it anyway, and string-stops make wllama hold back a lookahead buffer
+      // (~9 chars) that isn't flushed at end-of-turn and bleeds into the NEXT
+      // reply's opening (the "zone."/"for clarity." leak). TURN_CUT below still
+      // guards against the model emitting a literal role marker as text.
       onData: (chunk) => {
         if (myGen !== genId || frozen) return;
         if (cancelRequested) { frozen = true; return; }

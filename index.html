@@ -6,7 +6,7 @@
 <title>Parag — a tiny AI that lives in your browser</title>
 <meta name="description" content="Parag is a 0.5B-parameter chat model by Chaitanya (cxaiiii). It downloads once and runs entirely in your browser — no server, no API.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🪷</text></svg>">
-<link rel="stylesheet" href="./assets/style.css?v=3.4">
+<link rel="stylesheet" href="./assets/style.css?v=3.5">
 <script src="./coi-serviceworker.min.js"></script>
 </head>
 <body>
@@ -34,15 +34,6 @@
         One-time download of <strong>~380&nbsp;MB</strong> (cached for next time).
         Wi-Fi recommended. A laptop or desktop gives the best speed.
       </p>
-      
-      <div class="model-selector-wrap" style="text-align: center; margin: 1rem 0;">
-        <label for="model-select" style="color: #666; font-size: 0.9rem;">Choose your model:</label><br>
-        <select id="model-select" class="model-select" style="margin-top: 0.5rem; padding: 0.5rem; border-radius: 6px; background: rgba(0,0,0,0.05); border: 1px solid #ccc; font-family: inherit;">
-          <option value="parag-v3-0.5B">Parag Standard (0.5B)</option>
-          <option value="parag-v3-coder-0.5B">Parag Coder (0.5B)</option>
-        </select>
-      </div>
-
       <button id="btn-load" class="btn-primary">
         <span class="btn-label">Wake Parag up</span>
         <span class="btn-sub">download 380 MB &middot; free forever</span>
@@ -87,6 +78,6 @@
   </footer>
 </div>
 
-<script type="module" src="./assets/app.js?v=3.4"></script>
+<script type="module" src="./assets/app.js?v=3.5"></script>
 </body>
 </html>
