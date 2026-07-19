@@ -206,6 +206,14 @@ body {
 }
 @keyframes weave { to { background-position: -32px 0; } }
 
+/* Model-load phase: no download events arrive, so sweep the bar back and forth
+   instead of freezing, signalling that work is still happening. */
+.progress-bar.indeterminate {
+  width: 40% !important;
+  animation: weave 1.4s linear infinite, sweep 1.3s ease-in-out infinite alternate;
+}
+@keyframes sweep { from { margin-left: 0; } to { margin-left: 60%; } }
+
 .progress-row {
   display: flex;
   justify-content: space-between;

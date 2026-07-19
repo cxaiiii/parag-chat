@@ -48,7 +48,6 @@ const suggestions = $('suggestions');
 let wllama = null;
 let history = [];
 let generating = false;
-let aborter = null;
 
 // ————— model download (chunked, same-origin, cached) —————
 
@@ -111,11 +110,17 @@ btnLoad.addEventListener('click', async () => {
   btnLoad.disabled = true;
   progressWrap.hidden = false;
   loadError.hidden = true;
+  progressBar.style.width = '2%';
+  progressPct.textContent = '0%';
+  progressLabel.textContent = 'Starting download…';
   try {
     const modelBlob = await downloadModel();
 
+    // Model is loading into wasm — this can take 10-30s with no download events,
+    // so animate an indeterminate bar instead of freezing at 100%.
     progressLabel.textContent = 'Waking Parag up (loading into memory)…';
     progressPct.textContent = '';
+    progressBar.classList.add('indeterminate');
 
     wllama = new Wllama(
       { default: './wllama/wllama.wasm' },
@@ -131,6 +136,7 @@ btnLoad.addEventListener('click', async () => {
       : 'single thread';
     statLine.textContent = `local · ${mode} · ready`;
 
+    progressBar.classList.remove('indeterminate');
     landing.hidden = true;
     chatView.hidden = false;
     addParagMessage(
@@ -146,6 +152,7 @@ btnLoad.addEventListener('click', async () => {
       ' — please refresh and try again.';
     loadError.hidden = false;
     btnLoad.disabled = false;
+    progressBar.classList.remove('indeterminate');
   }
 });
 
@@ -176,7 +183,18 @@ function scrollToEnd() {
 
 // ————— generation —————
 
+// Cuts the reply at a genuine next-turn marker only. Anchored to the start of a
+// line and requires the ChatML role tag or a role word immediately followed by a
+// newline/colon at line-start — so ordinary prose like "the assistant said" or a
+// line ending before "User guide" is NOT chopped mid-sentence.
+const TURN_CUT = /<\|im_(?:end|start)\|>|^\s*(?:user|assistant|system)\s*[:\n]/im;
+
+let genId = 0;          // increments per generation; stale callbacks are ignored
+let cancelRequested = false; // set by the Stop button (soft-stop)
+
 async function generate(userText) {
+  const myGen = ++genId;
+  cancelRequested = false;
   generating = true;
   btnSend.disabled = true;
   btnStop.hidden = false;
@@ -193,75 +211,62 @@ async function generate(userText) {
     ...history.slice(-MAX_HISTORY),
   ];
 
-  aborter = new AbortController();
-  let text = '';
+  let text = '';       // canonical accumulated reply (never read back from DOM)
   let tokens = 0;
-  let stopped = false;
+  let frozen = false;  // once true, we stop appending (cut-marker or user stop)
   const t0 = performance.now();
 
   try {
+    // NOTE: we deliberately do NOT abort. wllama's abort is JS-only — it stops
+    // the result loop but leaves the C++ generation session live, and the NEXT
+    // createCompletion then resumes that stale session, leaking its tokens into
+    // the new reply. Instead we let the session wind down naturally (bounded by
+    // max_tokens) while keeping input disabled, so a new generation can never
+    // start mid-session. `frozen` just stops us displaying the wind-down tail.
     const result = await wllama.createCompletion({
       prompt: buildPrompt(context),
       stream: true,
-      max_tokens: 2048,
+      max_tokens: 512,
       temp: 0.6,
       penalty_repeat: 1.0,
       penalty_last_n: 128,
       cache_prompt: false,
       stop: ['<|im_end|>', '<|im_start|>'],
-      abortSignal: aborter.signal,
       onData: (chunk) => {
-        if (stopped) return;
+        if (myGen !== genId || frozen) return;
+        if (cancelRequested) { frozen = true; return; }
         const delta = chunk?.choices?.[0]?.text;
         if (!delta) return;
         text += delta;
         tokens += 1;
-        // safety: cut generation if the model emits raw turn markers as text
-        const cut = text.search(/<\|im_(end|start)\|>|\n\s*(user|assistant)\s*[:\n]/i);
-        if (cut !== -1) {
-          text = text.slice(0, cut);
-          stopped = true;
-          aborter.abort();
-        }
+        const m = text.match(TURN_CUT);
+        if (m) { text = text.slice(0, m.index); frozen = true; return; }
         bubble.textContent = text;
         scrollToEnd();
       },
     });
 
-    // Wllama may return a final chunk that wasn't dispatched via onData
-    // (e.g. the last token before EOG that was held in the C++ batch buffer).
-    // Merge it into our displayed text so nothing gets lost.
-    if (!stopped && result) {
-      const tail = result?.choices?.[0]?.text;
-      if (tail && !text.endsWith(tail)) {
-        // The result contains the FULL generated text, not just a delta.
-        // If it's longer than what we accumulated, use it.
-        const fullText = tail;
-        if (fullText.length > text.length) {
-          text = fullText;
-        }
-      }
-      // Clean any stop markers from the final text
-      const cut = text.search(/<\|im_(end|start)\|>/);
-      if (cut !== -1) text = text.slice(0, cut);
-      bubble.textContent = text;
+    // If we never froze, adopt wllama's final full string when it's longer than
+    // what streamed (last token can be held in the C++ batch buffer).
+    if (!frozen && myGen === genId && result) {
+      const full = result?.choices?.[0]?.text;
+      if (typeof full === 'string' && full.length > text.length) text = full;
+      const m = text.match(TURN_CUT);
+      if (m) text = text.slice(0, m.index);
     }
   } catch (err) {
-    if (err?.name !== 'AbortError' && !String(err).includes('abort')) {
-      if (!text) bubble.textContent = '(Sorry, something went wrong: ' + (err?.message || err) + ')';
-      console.error(err);
-    }
+    if (!text) bubble.textContent = '(Sorry, something went wrong: ' + (err?.message || err) + ')';
+    console.error(err);
   }
 
   bubble.classList.remove('thinking');
-  // FIX: Do NOT trim the text here! Trimming alters the exact string that wllama 
-  // holds in its KV cache. If we pass a trimmed string back in the next turn's prompt, 
-  // the token boundaries mismatch and wllama's cache_prompt logic corrupts, leaking text.
-  // Use the bubble's displayed text as the canonical content for history.
-  // This is the clean, post-slice version — immune to late onData callbacks.
-  const finalText = bubble.textContent;
-  if (finalText) history.push({ role: 'assistant', content: finalText });
-  else if (!bubble.textContent) bubble.textContent = '…';
+  const finalText = text.trim();
+  if (finalText) {
+    bubble.textContent = finalText;
+    history.push({ role: 'assistant', content: finalText });
+  } else {
+    bubble.textContent = '…';
+  }
 
   const secs = (performance.now() - t0) / 1000;
   if (tokens > 0) {
@@ -272,7 +277,6 @@ async function generate(userText) {
   generating = false;
   btnSend.disabled = false;
   btnStop.hidden = true;
-  aborter = null;
   input.focus();
 }
 
@@ -287,7 +291,14 @@ composer.addEventListener('submit', (e) => {
   generate(text);
 });
 
-btnStop.addEventListener('click', () => aborter?.abort());
+btnStop.addEventListener('click', () => {
+  // Soft-stop: freeze the visible reply immediately. The engine winds the
+  // session down on its own (bounded by max_tokens); input re-enables once it
+  // has fully settled, so the next message can't collide with a live session.
+  cancelRequested = true;
+  btnStop.hidden = true;
+  statLine.textContent = 'stopping…';
+});
 
 input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
