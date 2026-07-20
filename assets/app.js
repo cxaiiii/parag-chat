@@ -226,10 +226,20 @@ async function generate(userText) {
   ];
 
   let text = '';       // canonical accumulated reply (never read back from DOM)
+  let rawText = '';    // debug only: every delta, ignoring TURN_CUT / frozen
   let tokens = 0;
   let frozen = false;  // once true, we stop appending (cut-marker or user stop)
   const t0 = performance.now();
 
+  const promptStr = buildPrompt(context);
+  // Set window.__paragDebug = true in the console to see, per turn, the exact
+  // prompt sent and the RAW completion before TURN_CUT chops it. If the raw text
+  // contains a "\nUser:" / "\nassistant:" style header, the mid-sentence cutoff
+  // is TURN_CUT slicing a hallucinated turn boundary — i.e. the model derailed,
+  // not the plumbing.
+  if (window.__paragDebug) console.log('[parag] PROMPT >>>\n' + promptStr);
+
+  let result = null;
   try {
     // NOTE: we deliberately do NOT abort. wllama's abort is JS-only — it stops
     // the result loop but leaves the C++ generation session live, and the NEXT
@@ -237,13 +247,18 @@ async function generate(userText) {
     // the new reply. Instead we let the session wind down naturally (bounded by
     // max_tokens) while keeping input disabled, so a new generation can never
     // start mid-session. `frozen` just stops us displaying the wind-down tail.
-    const result = await wllama.createCompletion({
-      prompt: buildPrompt(context),
+    result = await wllama.createCompletion({
+      prompt: promptStr,
       stream: true,
       max_tokens: 1024,
       temp: 0.6,
-      penalty_repeat: 1.0,
-      penalty_last_n: 128,
+      // A 0.5B with no repetition penalty degenerates into loops
+      // ("…The Prime Minister of India is…The Prime Minister of India is…")
+      // and mangled tokens. 1.1 is the standard llama.cpp value that
+      // suppresses this without flattening normal phrasing. penalty_last_n
+      // spans well past the ~8-token loop window we were seeing.
+      penalty_repeat: 1.1,
+      penalty_last_n: 256,
       cache_prompt: false,
       // No `stop` strings: <|im_end|> is a native EOG token so generation stops
       // on it anyway, and string-stops make wllama hold back a lookahead buffer
@@ -251,9 +266,11 @@ async function generate(userText) {
       // reply's opening (the "zone."/"for clarity." leak). TURN_CUT below still
       // guards against the model emitting a literal role marker as text.
       onData: (chunk) => {
-        if (myGen !== genId || frozen) return;
-        if (cancelRequested) { frozen = true; return; }
+        if (myGen !== genId) return;
         const delta = chunk?.choices?.[0]?.text;
+        if (window.__paragDebug && typeof delta === 'string') rawText += delta;
+        if (frozen) return;
+        if (cancelRequested) { frozen = true; return; }
         if (!delta) return;
         text += delta;
         tokens += 1;
@@ -275,6 +292,12 @@ async function generate(userText) {
   } catch (err) {
     if (!text) bubble.textContent = '(Sorry, something went wrong: ' + (err?.message || err) + ')';
     console.error(err);
+  }
+
+  if (window.__paragDebug) {
+    console.log('[parag] RAW completion (pre-TURN_CUT) >>>\n' + rawText);
+    console.log('[parag] displayed (post-cut) >>>\n' + text);
+    console.log('[parag] frozen=' + frozen + ' tokens=' + tokens);
   }
 
   bubble.classList.remove('thinking');
