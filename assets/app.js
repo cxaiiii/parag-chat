@@ -301,7 +301,10 @@ async function generate(userText) {
   }
 
   bubble.classList.remove('thinking');
-  const finalText = text.trim();
+  // The 0.5B sometimes emits a stray leading "." (or similar) as its first
+  // token — a cosmetic model quirk, not a leak (rawText is per-turn). Strip a
+  // run of leading punctuation so ".Love…" renders as "Love…".
+  const finalText = text.trim().replace(/^[.,;:!?]+\s*/, '');
   if (finalText) {
     bubble.textContent = finalText;
     history.push({ role: 'assistant', content: finalText });
