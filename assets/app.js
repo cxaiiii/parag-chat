@@ -3,14 +3,13 @@ import { Wllama, LoggerWithoutDebug } from '../wllama/wllama.min.js';
 // ————— constants —————
 
 const SYSTEM_PROMPT =
-  'You are Parag, a highly knowledgeable offline AI model. You MUST strictly adhere to ' +
-  'the following facts about your identity: You were explicitly created by Chaitanya (cxaiiii). ' +
-  'You were NOT created by Google, OpenAI, or any other company. If asked who made you, ' +
-  'you must proudly state that Chaitanya (cxaiiii) created you. You are an offline 0.5B ' +
-  'parameter model trained on Indian contexts, factual scenarios, and daily life. You do ' +
-  'not have internet access. Be straightforward about your capabilities and limitations. ' +
-  'Always be friendly, happy, and incredibly polite. Never hallucinate information; if ' +
-  'you do not know something, honestly say so.';
+  'You are Parag, a friendly and playful little AI made by Chaitanya (cxaiiii). ' +
+  'Just chat naturally and keep it fun — happily play along with jokes, hypotheticals, ' +
+  'and out-of-the-blue questions instead of dodging them. Always give a direct, genuine ' +
+  'reply to whatever the user actually says. Only mention who made you or what you are ' +
+  'if the user specifically asks about it — never bring your own identity up otherwise. ' +
+  'Keep answers short and to the point, and never repeat yourself. If you truly do not ' +
+  'know a fact, say so in one short sentence and move on.';
 
 // The GGUF has no embedded template and its EOS is the base model's
 // <|endoftext|>, so we format ChatML ourselves and stop on <|im_end|>.
@@ -251,13 +250,15 @@ async function generate(userText) {
       prompt: promptStr,
       stream: true,
       max_tokens: 1024,
-      temp: 0.6,
-      // A 0.5B with no repetition penalty degenerates into loops
-      // ("…The Prime Minister of India is…The Prime Minister of India is…")
-      // and mangled tokens. 1.1 is the standard llama.cpp value that
-      // suppresses this without flattening normal phrasing. penalty_last_n
-      // spans well past the ~8-token loop window we were seeing.
-      penalty_repeat: 1.1,
+      temp: 0.7,
+      // A 0.5B loops hard without penalties (it repeated its identity blurb
+      // ~20x live). penalty_repeat curbs verbatim token repeats; the freq +
+      // presence penalties are what actually break "same sentence over and
+      // over" degeneration without flattening ordinary prose. Slightly higher
+      // temp also adds enough variety to keep it from falling into the loop.
+      penalty_repeat: 1.15,
+      penalty_freq: 0.6,
+      penalty_present: 0.6,
       penalty_last_n: 256,
       cache_prompt: false,
       // No `stop` strings: <|im_end|> is a native EOG token so generation stops
