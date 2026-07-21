@@ -397,3 +397,82 @@ body {
   .msg { max-width: 94%; }
   .suggestions { display: none; }
 }
+
+/* ————— model switcher ————— */
+.model-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.2rem 0.7rem;
+  flex-wrap: wrap;
+}
+.ms-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-right: 0.15rem;
+}
+.ms-btn {
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.32rem 0.8rem;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.1s;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+.ms-btn:hover:not(:disabled):not(.active) { border-color: var(--marigold); color: var(--ink); }
+.ms-btn .ms-tag {
+  font-size: 0.66rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.03em;
+}
+.ms-btn.active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.ms-btn.active .ms-tag { color: rgba(246, 238, 221, 0.7); }
+.ms-btn.loading {
+  border-color: var(--marigold);
+  color: var(--marigold-deep);
+  position: relative;
+}
+.ms-btn.loading::after {
+  content: '';
+  width: 9px; height: 9px;
+  border: 2px solid var(--marigold);
+  border-top-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 0.1rem;
+  animation: ms-spin 0.7s linear infinite;
+  align-self: center;
+}
+.ms-btn:disabled { cursor: default; opacity: 0.75; }
+@keyframes ms-spin { to { transform: rotate(360deg); } }
+
+/* switch divider inside the transcript */
+.msg-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  gap: 0.7rem;
+  margin: 1.1rem 0 0.4rem;
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.msg-divider::before, .msg-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}

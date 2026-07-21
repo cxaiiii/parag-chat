@@ -2,14 +2,42 @@ import { Wllama, LoggerWithoutDebug } from '../wllama/wllama.min.js';
 
 // ————— constants —————
 
-const SYSTEM_PROMPT =
-  'You are Parag, a friendly and playful little AI made by Chaitanya (cxaiiii). ' +
-  'Just chat naturally and keep it fun — happily play along with jokes, hypotheticals, ' +
-  'and out-of-the-blue questions instead of dodging them. Always give a direct, genuine ' +
-  'reply to whatever the user actually says. Only mention who made you or what you are ' +
-  'if the user specifically asks about it — never bring your own identity up otherwise. ' +
-  'Keep answers short and to the point, and never repeat yourself. If you truly do not ' +
-  'know a fact, say so in one short sentence and move on.';
+// Each model ships with the system prompt it expects. v4 was TRAINED with its
+// prompt verbatim, so it must match exactly. v3 uses the lighter "play along"
+// prompt we tuned to tame its identity-blurb reflex.
+const MODELS = {
+  'parag-v4-0.6B': {
+    label: 'Parag v4',
+    tag: '0.6B',
+    ctx: 4096,
+    system:
+      'You are Parag, a friendly little AI made by Chaitanya (cxaiiii). ' +
+      'Chat naturally, play along with fun, keep answers matched to the question, ' +
+      'and always finish your sentences.',
+    greeting:
+      "Namaste! 🙏 I'm Parag v4 — Chaitanya's newest little AI, running entirely in " +
+      'your browser. Ask me anything, or just have some fun with me.',
+  },
+  'parag-v3-0.5B': {
+    label: 'Parag v3',
+    tag: '0.5B',
+    ctx: 4096,
+    system:
+      'You are Parag, a friendly and playful little AI made by Chaitanya (cxaiiii). ' +
+      'Just chat naturally and keep it fun — happily play along with jokes, hypotheticals, ' +
+      'and out-of-the-blue questions instead of dodging them. Always give a direct, genuine ' +
+      'reply to whatever the user actually says. Only mention who made you or what you are ' +
+      'if the user specifically asks about it — never bring your own identity up otherwise. ' +
+      'Keep answers short and to the point, and never repeat yourself. If you truly do not ' +
+      'know a fact, say so in one short sentence and move on.',
+    greeting:
+      "Namaste! 🙏 I'm Parag v3 (0.5B), the older model — kept here so you can compare. " +
+      'Nothing you say leaves this device.',
+  },
+};
+const DEFAULT_MODEL = 'parag-v4-0.6B';
+let currentModelId = DEFAULT_MODEL;
+const currentSystem = () => MODELS[currentModelId].system;
 
 // The GGUF has no embedded template and its EOS is the base model's
 // <|endoftext|>, so we format ChatML ourselves and stop on <|im_end|>.
@@ -20,7 +48,6 @@ function buildPrompt(context) {
 }
 
 const MODEL_DIR = './model/';
-const CACHE_NAME = 'parag-model-v3'; // Bumped cache name to invalidate v2
 const MAX_HISTORY = 8; // messages (excl. system) kept in context
 
 // ————— elements —————
@@ -72,12 +99,13 @@ async function getChunk(url, cache, onBytes) {
   return blob;
 }
 
-const MODEL_NAME = 'parag-v3-0.5B'; // only model we ship
 const DOWNLOAD_CONCURRENCY = 6;     // parallel chunk fetches
 
-async function downloadModel() {
-  const manifestUrl = MODEL_DIR + 'manifest-' + MODEL_NAME + '.json';
-  const cacheName = 'parag-model-' + MODEL_NAME;
+// Download a model's chunks (cached per-model) and assemble one Blob.
+// `onProgress(received, total)` is called as bytes stream in.
+async function downloadModel(modelId, onProgress) {
+  const manifestUrl = MODEL_DIR + 'manifest-' + modelId + '.json';
+  const cacheName = 'parag-model-' + modelId;
 
   const manifest = await (await fetch(manifestUrl)).json();
   const cache = await caches.open(cacheName).catch(() => null);
@@ -86,11 +114,7 @@ async function downloadModel() {
 
   const onBytes = (n) => {
     received += n;
-    const pct = Math.min(100, (received / total) * 100);
-    progressBar.style.width = pct.toFixed(1) + '%';
-    progressPct.textContent = pct.toFixed(0) + '%';
-    progressLabel.textContent =
-      `Downloading Parag — ${(received / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`;
+    onProgress(received, total);
   };
 
   // Fetch chunks with a bounded concurrency pool. The old code awaited each
@@ -117,7 +141,34 @@ async function downloadModel() {
   return new Blob(blobs);
 }
 
-// ————— boot —————
+// ————— model loading (shared by first boot + switching) —————
+
+let switching = false;
+
+// Download + load a model into a fresh Wllama instance. Callbacks let the
+// caller drive whatever progress UI it wants (big landing bar vs. the compact
+// switcher). Returns the ready Wllama.
+async function loadModelInto(modelId, onProgress, onLoadingStage) {
+  const blob = await downloadModel(modelId, onProgress);
+  onLoadingStage();
+  const w = new Wllama(
+    { default: './wllama/wllama.wasm' },
+    { suppressNativeLog: true, logger: LoggerWithoutDebug }
+  );
+  w.setCompat('default'); // only kicks in on browsers that need it (Safari)
+  await w.loadModel([blob], { n_ctx: MODELS[modelId].ctx });
+  return w;
+}
+
+function engineLabel() {
+  // WebGPU (wllama 3.1+) runs the GGUF on the GPU — 45-69% faster decode.
+  const gpu = wllama.isSupportWebGPU();
+  console.log('[parag] WebGPU supported:', gpu,
+    '| multithread:', wllama.isMultithread(), '| threads:', wllama.getNumThreads());
+  return gpu ? 'GPU' : (wllama.isMultithread() ? `${wllama.getNumThreads()} threads` : 'single thread');
+}
+
+// ————— boot (first load, from the landing page) —————
 
 btnLoad.addEventListener('click', async () => {
   btnLoad.disabled = true;
@@ -127,44 +178,30 @@ btnLoad.addEventListener('click', async () => {
   progressPct.textContent = '0%';
   progressLabel.textContent = 'Starting download…';
   try {
-    const modelBlob = await downloadModel();
-
-    // Model is loading into wasm — this can take 10-30s with no download events,
-    // so animate an indeterminate bar instead of freezing at 100%.
-    progressLabel.textContent = 'Waking Parag up (loading into memory)…';
-    progressPct.textContent = '';
-    progressBar.classList.add('indeterminate');
-
-    wllama = new Wllama(
-      { default: './wllama/wllama.wasm' },
-      { suppressNativeLog: true, logger: LoggerWithoutDebug }
+    wllama = await loadModelInto(
+      currentModelId,
+      (received, total) => {
+        const pct = Math.min(100, (received / total) * 100);
+        progressBar.style.width = pct.toFixed(1) + '%';
+        progressPct.textContent = pct.toFixed(0) + '%';
+        progressLabel.textContent =
+          `Downloading ${MODELS[currentModelId].label} — ${(received / 1048576).toFixed(0)} / ${(total / 1048576).toFixed(0)} MB`;
+      },
+      () => {
+        // loading into wasm — no download events for 10-30s, so animate.
+        progressLabel.textContent = 'Waking Parag up (loading into memory)…';
+        progressPct.textContent = '';
+        progressBar.classList.add('indeterminate');
+      }
     );
-    wllama.setCompat('default'); // only kicks in on browsers that need it (Safari)
-
-    await wllama.loadModel([modelBlob], { n_ctx: 4096 });
     window.__wllama = wllama; // debugging hook
-
-    // WebGPU (wllama 3.1+) runs the GGUF on the GPU — 45-69% faster decode.
-    // It's a single build with runtime toggling: default n_gpu_layers=99999
-    // offloads all layers when the browser supports WebGPU, else falls back to
-    // CPU/WASM automatically. Surface which backend actually engaged.
-    const gpu = wllama.isSupportWebGPU();
-    console.log('[parag] WebGPU supported:', gpu,
-      '| multithread:', wllama.isMultithread(),
-      '| threads:', wllama.getNumThreads());
-    const engine = gpu
-      ? 'GPU'
-      : (wllama.isMultithread() ? `${wllama.getNumThreads()} threads` : 'single thread');
-    statLine.textContent = `local · ${engine} · ready`;
+    statLine.textContent = `local · ${engineLabel()} · ready`;
 
     progressBar.classList.remove('indeterminate');
     landing.hidden = true;
     chatView.hidden = false;
-    addParagMessage(
-      'Namaste! 🙏 I am Parag, a small AI made by Chaitanya. ' +
-      'I live entirely in your browser — nothing you say leaves this device. ' +
-      'How can I help you today?'
-    );
+    renderSwitcher();
+    addParagMessage(MODELS[currentModelId].greeting);
     input.focus();
   } catch (err) {
     console.error(err);
@@ -175,6 +212,63 @@ btnLoad.addEventListener('click', async () => {
     btnLoad.disabled = false;
     progressBar.classList.remove('indeterminate');
   }
+});
+
+// ————— model switcher —————
+
+async function switchModel(modelId) {
+  if (modelId === currentModelId || generating || switching) return;
+  switching = true;
+  btnSend.disabled = true;
+  input.disabled = true;
+  renderSwitcher(modelId); // mark target as loading
+
+  try {
+    // Free the current model before loading the next (two 380 MB models won't
+    // both fit in wasm memory). wllama.exit() releases the worker + weights.
+    if (wllama) { await wllama.exit().catch(() => {}); wllama = null; }
+
+    wllama = await loadModelInto(
+      modelId,
+      (received, total) => {
+        statLine.textContent = `loading ${MODELS[modelId].label} · ${Math.round((received / total) * 100)}%`;
+      },
+      () => { statLine.textContent = `waking ${MODELS[modelId].label}…`; }
+    );
+    window.__wllama = wllama;
+    currentModelId = modelId;
+    history = []; // fresh context — the new model shouldn't inherit the old one's turns
+
+    addDivider(`switched to ${MODELS[modelId].label} · ${MODELS[modelId].tag}`);
+    addParagMessage(MODELS[modelId].greeting);
+    statLine.textContent = `local · ${engineLabel()} · ready`;
+  } catch (err) {
+    console.error(err);
+    statLine.textContent = 'switch failed — please refresh';
+  } finally {
+    switching = false;
+    btnSend.disabled = false;
+    input.disabled = false;
+    renderSwitcher();
+    input.focus();
+  }
+}
+
+// Paint the switcher buttons: active model highlighted, target shows "loading".
+function renderSwitcher(loadingId = null) {
+  const wrap = $('model-switch');
+  if (!wrap) return;
+  wrap.querySelectorAll('.ms-btn').forEach((btn) => {
+    const id = btn.dataset.model;
+    btn.classList.toggle('active', id === currentModelId && !loadingId);
+    btn.classList.toggle('loading', id === loadingId);
+    btn.disabled = switching || generating;
+  });
+}
+
+document.getElementById('model-switch')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.ms-btn');
+  if (btn) switchModel(btn.dataset.model);
 });
 
 // ————— chat rendering —————
@@ -196,6 +290,14 @@ function addParagMessage(text) {
   messagesEl.appendChild(wrap);
   scrollToEnd();
   return bubble;
+}
+
+function addDivider(text) {
+  const div = document.createElement('div');
+  div.className = 'msg-divider';
+  div.innerHTML = `<span>${text}</span>`;
+  messagesEl.appendChild(div);
+  scrollToEnd();
 }
 
 function scrollToEnd() {
@@ -220,6 +322,7 @@ async function generate(userText) {
   btnSend.disabled = true;
   btnStop.hidden = false;
   suggestions.style.display = 'none';
+  renderSwitcher();
 
   history.push({ role: 'user', content: userText });
   addUserMessage(userText);
@@ -228,7 +331,7 @@ async function generate(userText) {
   bubble.classList.add('thinking');
 
   const context = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: currentSystem() },
     ...history.slice(-MAX_HISTORY),
   ];
 
@@ -330,6 +433,7 @@ async function generate(userText) {
   generating = false;
   btnSend.disabled = false;
   btnStop.hidden = true;
+  renderSwitcher();
   input.focus();
 }
 

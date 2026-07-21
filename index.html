@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Parag — a tiny AI that lives in your browser</title>
-<meta name="description" content="Parag is a 0.5B-parameter chat model by Chaitanya (cxaiiii). It downloads once and runs entirely in your browser — no server, no API.">
+<meta name="description" content="Parag is a sub-billion-parameter chat model by Chaitanya (cxaiiii). It downloads once and runs entirely in your browser — no server, no API. Switch between v4 (0.6B) and v3 (0.5B).">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🪷</text></svg>">
-<link rel="stylesheet" href="./assets/style.css?v=3.7">
+<link rel="stylesheet" href="./assets/style.css?v=3.8">
 <script src="./coi-serviceworker.min.js"></script>
 </head>
 <body>
@@ -17,7 +17,7 @@
       <span class="wordmark-hindi" aria-hidden="true">पराग</span>
       <h1 class="wordmark-latin">Parag</h1>
     </div>
-    <p class="masthead-tag">a pocket-sized AI &middot; 0.5&thinsp;B parameters &middot; runs entirely in <em>your</em> browser</p>
+    <p class="masthead-tag">a pocket-sized AI &middot; 0.6&thinsp;B parameters &middot; runs entirely in <em>your</em> browser</p>
   </header>
 
   <!-- ============ LANDING / DOWNLOAD STATE ============ -->
@@ -31,8 +31,9 @@
         the model itself downloads to your device and thinks right here in the browser.
       </p>
       <p class="landing-note">
-        One-time download of <strong>~380&nbsp;MB</strong> (cached for next time).
-        Wi-Fi recommended. A laptop or desktop gives the best speed.
+        Loads the newest <strong>Parag&nbsp;v4 (0.6B)</strong> — one-time download of
+        <strong>~380&nbsp;MB</strong>, cached for next time. Inside, you can switch to the
+        older <strong>v3 (0.5B)</strong> to compare. Wi-Fi and a laptop give the best speed.
       </p>
       <button id="btn-load" class="btn-primary">
         <span class="btn-label">Wake Parag up</span>
@@ -53,6 +54,11 @@
 
   <!-- ============ CHAT STATE ============ -->
   <main id="chat" class="chat" hidden>
+    <div class="model-switch" id="model-switch" role="group" aria-label="Choose model">
+      <span class="ms-label">model</span>
+      <button class="ms-btn active" data-model="parag-v4-0.6B" type="button">Parag&nbsp;v4 <span class="ms-tag">0.6B</span></button>
+      <button class="ms-btn" data-model="parag-v3-0.5B" type="button">Parag&nbsp;v3 <span class="ms-tag">0.5B</span></button>
+    </div>
     <div id="messages" class="messages" aria-live="polite"></div>
 
     <div class="composer-wrap">
@@ -78,6 +84,6 @@
   </footer>
 </div>
 
-<script type="module" src="./assets/app.js?v=3.7"></script>
+<script type="module" src="./assets/app.js?v=3.8"></script>
 </body>
 </html>
