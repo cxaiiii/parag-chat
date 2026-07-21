@@ -144,10 +144,18 @@ btnLoad.addEventListener('click', async () => {
     await wllama.loadModel([modelBlob], { n_ctx: 4096 });
     window.__wllama = wllama; // debugging hook
 
-    const mode = wllama.isMultithread()
-      ? `${wllama.getNumThreads()} threads`
-      : 'single thread';
-    statLine.textContent = `local · ${mode} · ready`;
+    // WebGPU (wllama 3.1+) runs the GGUF on the GPU — 45-69% faster decode.
+    // It's a single build with runtime toggling: default n_gpu_layers=99999
+    // offloads all layers when the browser supports WebGPU, else falls back to
+    // CPU/WASM automatically. Surface which backend actually engaged.
+    const gpu = wllama.isSupportWebGPU();
+    console.log('[parag] WebGPU supported:', gpu,
+      '| multithread:', wllama.isMultithread(),
+      '| threads:', wllama.getNumThreads());
+    const engine = gpu
+      ? 'GPU'
+      : (wllama.isMultithread() ? `${wllama.getNumThreads()} threads` : 'single thread');
+    statLine.textContent = `local · ${engine} · ready`;
 
     progressBar.classList.remove('indeterminate');
     landing.hidden = true;
