@@ -203,6 +203,19 @@ btnLoad.addEventListener('click', async () => {
     renderSwitcher();
     addParagMessage(MODELS[currentModelId].greeting);
     input.focus();
+    
+    // Optional: Try loading an external system prompt for v4 so it can be edited without code
+    try {
+      const spRes = await fetch('./system_prompt.txt');
+      if (spRes.ok) {
+        const text = await spRes.text();
+        if (text.trim()) {
+          MODELS['parag-v4-0.6B'].system = text.trim();
+          console.log('[parag] Loaded external system_prompt.txt');
+        }
+      }
+    } catch(e) { /* ignore if not found */ }
+    
   } catch (err) {
     console.error(err);
     loadError.textContent =
@@ -360,7 +373,7 @@ async function generate(userText) {
     result = await wllama.createCompletion({
       prompt: promptStr,
       stream: true,
-      max_tokens: 1024,
+      max_tokens: 2048,
       temp: 0.7,
       // A 0.5B loops hard without penalties (it repeated its identity blurb
       // ~20x live). penalty_repeat curbs verbatim token repeats; the freq +
