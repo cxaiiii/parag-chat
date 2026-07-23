@@ -380,10 +380,10 @@ async function generate(userText) {
       // presence penalties are what actually break "same sentence over and
       // over" degeneration without flattening ordinary prose. Slightly higher
       // temp also adds enough variety to keep it from falling into the loop.
-      penalty_repeat: 1.15,
+      penalty_repeat: 1.1,
       penalty_freq: 0.6,
       penalty_present: 0.6,
-      penalty_last_n: 256,
+      penalty_last_n: 64,
       cache_prompt: false,
       // No `stop` strings: <|im_end|> is a native EOG token so generation stops
       // on it anyway, and string-stops make wllama hold back a lookahead buffer
