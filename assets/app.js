@@ -381,8 +381,8 @@ async function generate(userText) {
       // over" degeneration without flattening ordinary prose. Slightly higher
       // temp also adds enough variety to keep it from falling into the loop.
       penalty_repeat: 1.1,
-      penalty_freq: 0.6,
-      penalty_present: 0.6,
+      penalty_freq: 0.0,
+      penalty_present: 0.0,
       penalty_last_n: 64,
       cache_prompt: false,
       // No `stop` strings: <|im_end|> is a native EOG token so generation stops
