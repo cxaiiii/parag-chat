@@ -6,7 +6,7 @@ import { Wllama, LoggerWithoutDebug } from '../wllama/wllama.min.js';
 // prompt verbatim, so it must match exactly. v3 uses the lighter "play along"
 // prompt we tuned to tame its identity-blurb reflex.
 const MODELS = {
-  'parag-v4-0.6B': {
+  'parag-v4.1-0.6B': {
     label: 'Parag v4',
     tag: '0.6B',
     ctx: 4096,
@@ -35,7 +35,7 @@ const MODELS = {
       'Nothing you say leaves this device.',
   },
 };
-const DEFAULT_MODEL = 'parag-v4-0.6B';
+const DEFAULT_MODEL = 'parag-v4.1-0.6B';
 let currentModelId = DEFAULT_MODEL;
 const currentSystem = () => MODELS[currentModelId].system;
 
@@ -210,7 +210,7 @@ btnLoad.addEventListener('click', async () => {
       if (spRes.ok) {
         const text = await spRes.text();
         if (text.trim()) {
-          MODELS['parag-v4-0.6B'].system = text.trim();
+          MODELS['parag-v4.1-0.6B'].system = text.trim();
           console.log('[parag] Loaded external system_prompt.txt');
         }
       }
