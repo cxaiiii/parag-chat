@@ -105,10 +105,10 @@ const DOWNLOAD_CONCURRENCY = 6;     // parallel chunk fetches
 // `onProgress(received, total)` is called as bytes stream in.
 async function downloadModel(modelId, onProgress) {
   const manifestUrl = MODEL_DIR + 'manifest-' + modelId + '.json';
-  const cacheName = 'parag-model-' + modelId;
+  const CACHE_NAME = 'parag-model-v2';
 
   const manifest = await (await fetch(manifestUrl)).json();
-  const cache = await caches.open(cacheName).catch(() => null);
+  const cache = await caches.open(CACHE_NAME).catch(() => null);
   const total = manifest.totalSize;
   let received = 0;
 
