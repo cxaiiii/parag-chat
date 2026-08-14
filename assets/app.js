@@ -50,6 +50,31 @@ function buildPrompt(context) {
 const MODEL_DIR = './model/';
 const MAX_HISTORY = 8; // messages (excl. system) kept in context
 
+// wllama defaults to half of the reported CPU cores. That is conservative for
+// a general-purpose library, but it leaves decode throughput on the table for
+// small local models. Reserve one core for the browser and cap before the
+// little cores on large phones start costing more than they help.
+function getRuntimeProfile() {
+  const cores = Math.max(1, navigator.hardwareConcurrency || 2);
+  const memoryGB = navigator.deviceMemory;
+  const isMobile = navigator.userAgentData?.mobile ||
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    matchMedia('(pointer: coarse)').matches;
+  const lowMemory = memoryGB !== undefined && memoryGB <= 4;
+
+  return {
+    threads: cores <= 4 ? cores : Math.min(6, cores - 1),
+    isMobile,
+    // A 2K context is plenty for a phone chat and reduces KV-cache pressure.
+    context: isMobile || lowMemory ? 2048 : 4096,
+    // This accelerates prompt ingestion; streamed decode remains token-wise.
+    batch: isMobile ? 384 : 512,
+  };
+}
+
+const RUNTIME = getRuntimeProfile();
+const MAX_CONTEXT_CHARS = RUNTIME.context * 3;
+
 // ————— elements —————
 
 const $ = (id) => document.getElementById(id);
@@ -156,7 +181,15 @@ async function loadModelInto(modelId, onProgress, onLoadingStage) {
     { suppressNativeLog: true, logger: LoggerWithoutDebug }
   );
   w.setCompat('default'); // only kicks in on browsers that need it (Safari)
-  await w.loadModel([blob], { n_ctx: MODELS[modelId].ctx });
+  await w.loadModel([blob], {
+    n_ctx: Math.min(MODELS[modelId].ctx, RUNTIME.context),
+    n_threads: RUNTIME.threads,
+    n_batch: RUNTIME.batch,
+    // Use every layer on WebGPU when it is available; retain a CPU fallback.
+    n_gpu_layers: w.isSupportWebGPU() ? 99999 : 0,
+    offload_kqv: true,
+    flash_attn: true,
+  });
   return w;
 }
 
@@ -164,8 +197,11 @@ function engineLabel() {
   // WebGPU (wllama 3.1+) runs the GGUF on the GPU — 45-69% faster decode.
   const gpu = wllama.isSupportWebGPU();
   console.log('[parag] WebGPU supported:', gpu,
-    '| multithread:', wllama.isMultithread(), '| threads:', wllama.getNumThreads());
-  return gpu ? 'GPU' : (wllama.isMultithread() ? `${wllama.getNumThreads()} threads` : 'single thread');
+    '| multithread:', wllama.isMultithread(), '| threads:', wllama.getNumThreads(),
+    '| context:', RUNTIME.context, '| batch:', RUNTIME.batch);
+  return gpu
+    ? `WebGPU + ${wllama.getNumThreads()} CPU threads`
+    : (wllama.isMultithread() ? `${wllama.getNumThreads()} threads` : 'single thread');
 }
 
 // ————— boot (first load, from the landing page) —————
@@ -328,6 +364,23 @@ const TURN_CUT = /<\|im_(?:end|start)\|>|^\s*(?:user|assistant|system)\s*[:\n]/i
 let genId = 0;          // increments per generation; stale callbacks are ignored
 let cancelRequested = false; // set by the Stop button (soft-stop)
 
+// Keep the newest turns but bound prompt work by the active context profile.
+// A count-only history can grow into a huge prefill after a long chat, making
+// an otherwise fast decoder feel stalled before its first token.
+function getPromptContext() {
+  const system = { role: 'system', content: currentSystem() };
+  const retained = [];
+  let used = system.content.length + 64;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const message = history[i];
+    const cost = message.content.length + 32;
+    if (retained.length && used + cost > MAX_CONTEXT_CHARS) break;
+    retained.unshift(message);
+    used += cost;
+  }
+  return [system, ...retained];
+}
+
 async function generate(userText) {
   const myGen = ++genId;
   cancelRequested = false;
@@ -343,16 +396,26 @@ async function generate(userText) {
   const bubble = addParagMessage('');
   bubble.classList.add('thinking');
 
-  const context = [
-    { role: 'system', content: currentSystem() },
-    ...history.slice(-MAX_HISTORY),
-  ];
+  const context = getPromptContext();
 
   let text = '';       // canonical accumulated reply (never read back from DOM)
   let rawText = '';    // debug only: every delta, ignoring TURN_CUT / frozen
   let tokens = 0;
   let frozen = false;  // once true, we stop appending (cut-marker or user stop)
   const t0 = performance.now();
+  let renderFrame = 0;
+  let needsRender = false;
+  const renderReply = () => {
+    renderFrame = 0;
+    if (!needsRender || frozen) return;
+    needsRender = false;
+    bubble.textContent = text;
+    scrollToEnd();
+  };
+  const scheduleReplyRender = () => {
+    needsRender = true;
+    if (!renderFrame) renderFrame = requestAnimationFrame(renderReply);
+  };
 
   const promptStr = buildPrompt(context);
   // Set window.__paragDebug = true in the console to see, per turn, the exact
@@ -384,7 +447,9 @@ async function generate(userText) {
       penalty_freq: 0.0,
       penalty_present: 0.0,
       penalty_last_n: 64,
-      cache_prompt: false,
+      // Reuse the unchanged system prompt and prior turns in llama.cpp's KV
+      // cache. This cuts time-to-first-token substantially on follow-ups.
+      cache_prompt: true,
       // No `stop` strings: <|im_end|> is a native EOG token so generation stops
       // on it anyway, and string-stops make wllama hold back a lookahead buffer
       // (~9 chars) that isn't flushed at end-of-turn and bleeds into the NEXT
@@ -401,8 +466,9 @@ async function generate(userText) {
         tokens += 1;
         const m = text.match(TURN_CUT);
         if (m) { text = text.slice(0, m.index); frozen = true; return; }
-        bubble.textContent = text;
-        scrollToEnd();
+        // A worker can deliver multiple chunks in a frame. One DOM update per
+        // frame avoids repeated mobile layout/scroll work while staying live.
+        scheduleReplyRender();
       },
     });
 
@@ -418,6 +484,8 @@ async function generate(userText) {
     if (!text) bubble.textContent = '(Sorry, something went wrong: ' + (err?.message || err) + ')';
     console.error(err);
   }
+
+  if (renderFrame) cancelAnimationFrame(renderFrame);
 
   if (window.__paragDebug) {
     console.log('[parag] RAW completion (pre-TURN_CUT) >>>\n' + rawText);
