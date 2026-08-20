@@ -18,6 +18,7 @@ const MODELS = {
     tag: '0.8B',
     ctx: 4096,
     system: '',
+    thinkPrefix: true,
     greeting:
       "Namaste! 🙏 I'm Parag v5 — 0.8B, trained on multi-turn conversations so I " +
       'can follow a thread properly. Running entirely in your browser.',
@@ -57,10 +58,20 @@ const currentSystem = () => MODELS[currentModelId].system;
 
 // The GGUF has no embedded template and its EOS is the base model's
 // <|endoftext|>, so we format ChatML ourselves and stop on <|im_end|>.
+//
+// thinkPrefix: Qwen3.5 templates rendered with enable_thinking=False do not
+// merely omit reasoning -- they emit an EMPTY <think></think> block into the
+// assistant turn. v5's training data was rendered that way, so every assistant
+// turn it ever saw began with that block. Ending the prompt at
+// "<|im_start|>assistant\n" leaves the model to produce the block itself,
+// which it does, visibly, in the chat window. Supplying it closes the gap:
+// verified locally, same reply, block no longer leaks into the UI.
 function buildPrompt(context) {
   let p = '';
   for (const m of context) p += `<|im_start|>${m.role}\n${m.content}<|im_end|>\n`;
-  return p + '<|im_start|>assistant\n';
+  p += '<|im_start|>assistant\n';
+  if (MODELS[currentModelId].thinkPrefix) p += '<think>\n\n</think>\n\n';
+  return p;
 }
 
 const MODEL_DIR = './model/';
