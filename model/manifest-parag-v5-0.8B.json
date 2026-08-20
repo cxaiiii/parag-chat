@@ -1,0 +1,209 @@
+{
+  "totalSize": 529297184,
+  "chunks": [
+    {
+      "file": "parag-v5-0.8B-000.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-001.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-002.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-003.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-004.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-005.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-006.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-007.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-008.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-009.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-010.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-011.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-012.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-013.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-014.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-015.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-016.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-017.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-018.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-019.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-020.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-021.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-022.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-023.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-024.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-025.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-026.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-027.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-028.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-029.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-030.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-031.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-032.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-033.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-034.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-035.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-036.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-037.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-038.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-039.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-040.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-041.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-042.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-043.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-044.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-045.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-046.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-047.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-048.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-049.bin",
+      "size": 10485760
+    },
+    {
+      "file": "parag-v5-0.8B-050.bin",
+      "size": 5009184
+    }
+  ]
+}

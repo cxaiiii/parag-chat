@@ -6,6 +6,22 @@ import { Wllama, LoggerWithoutDebug } from '../wllama/wllama.min.js';
 // prompt verbatim, so it must match exactly. v3 uses the lighter "play along"
 // prompt we tuned to tame its identity-blurb reflex.
 const MODELS = {
+  // v5 was trained on 20,906 rows of which ZERO contain a system turn — every
+  // example begins with `user`. It has never seen a system message, so supplying
+  // one is off-distribution in exactly the way that produced the v4 identity
+  // mode collapse ("revert system prompt to training distribution"). The empty
+  // string makes getPromptContext drop the turn entirely rather than emit a
+  // hollow <|im_start|>system<|im_end|> pair, which is itself a sequence v5
+  // never saw.
+  'parag-v5-0.8B': {
+    label: 'Parag v5',
+    tag: '0.8B',
+    ctx: 4096,
+    system: '',
+    greeting:
+      "Namaste! 🙏 I'm Parag v5 — 0.8B, trained on multi-turn conversations so I " +
+      'can follow a thread properly. Running entirely in your browser.',
+  },
   'parag-v4.1-0.6B': {
     label: 'Parag v4',
     tag: '0.6B',
@@ -35,7 +51,7 @@ const MODELS = {
       'Nothing you say leaves this device.',
   },
 };
-const DEFAULT_MODEL = 'parag-v4.1-0.6B';
+const DEFAULT_MODEL = 'parag-v5-0.8B';
 let currentModelId = DEFAULT_MODEL;
 const currentSystem = () => MODELS[currentModelId].system;
 
@@ -368,9 +384,12 @@ let cancelRequested = false; // set by the Stop button (soft-stop)
 // A count-only history can grow into a huge prefill after a long chat, making
 // an otherwise fast decoder feel stalled before its first token.
 function getPromptContext() {
-  const system = { role: 'system', content: currentSystem() };
+  // A model trained without system turns must not be given one. v5's data has
+  // zero system messages, so it gets no system turn at all — not an empty one.
+  const sys = currentSystem();
+  const system = sys ? { role: 'system', content: sys } : null;
   const retained = [];
-  let used = system.content.length + 64;
+  let used = (system ? system.content.length : 0) + 64;
   for (let i = history.length - 1; i >= 0; i--) {
     const message = history[i];
     const cost = message.content.length + 32;
@@ -378,7 +397,7 @@ function getPromptContext() {
     retained.unshift(message);
     used += cost;
   }
-  return [system, ...retained];
+  return system ? [system, ...retained] : retained;
 }
 
 async function generate(userText) {
